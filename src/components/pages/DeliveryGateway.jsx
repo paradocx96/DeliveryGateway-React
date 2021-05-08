@@ -1,19 +1,19 @@
-import React from 'react';
-import {Link} from 'react-router-dom';
-import {Button, Col, Form, Card} from 'react-bootstrap';
+import React from "react";
+import {Button, Col, Form, Card, Table} from 'react-bootstrap';
 import 'bootstrap/dist/css/bootstrap.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import AddressService from '../service/AddressService';
+import AddressService from "../../service/AddressService";
 
-
-class Address extends React.Component {
+class DeliveryGateway extends React.Component {
 
     constructor(props) {
         super(props);
 
         this.state = this.initialState;
-        this.submitAddresss = this.submitAddresss.bind(this);
+        this.calculateAddress = this.calculateAddress.bind(this);
+        this.submitAddress = this.submitAddress.bind(this);
         this.resetForm = this.resetForm.bind(this);
+
         this.assignAddressHandler = this.assignAddressHandler.bind();
         this.assignProvinceHandler = this.assignProvinceHandler.bind();
         this.assignDistrictHandler = this.assignDistrictHandler.bind();
@@ -24,6 +24,10 @@ class Address extends React.Component {
     }
 
     initialState = {
+        orderCost: 1000.00,
+        deliveryCost: 0.00,
+        totalCost: 0.00,
+
         userid: '',
         title: '',
         addresss: '',
@@ -31,29 +35,37 @@ class Address extends React.Component {
         district: '',
         city: '',
         zip: '',
-        phone: ''
+        phone: '',
+
+        title2: '',
+        address2: '',
+        province2: '',
+        district2: '',
+        city2: '',
+        zip2: '',
+        phone2: ''
     }
 
     assignAddressHandler = (event) => {
-        this.setState({addresss : event.target.value})
+        this.setState({addresss: event.target.value})
     }
     assignProvinceHandler = (event) => {
-        this.setState({province : event.target.value})
+        this.setState({province: event.target.value})
     }
     assignDistrictHandler = (event) => {
-        this.setState({district : event.target.value})
+        this.setState({district: event.target.value})
     }
     assignCityHandler = (event) => {
-        this.setState({city : event.target.value})
+        this.setState({city: event.target.value})
     }
     assignZipHandler = (event) => {
-        this.setState({zip : event.target.value})
+        this.setState({zip: event.target.value})
     }
     assignPhoneHandler = (event) => {
-        this.setState({phone : event.target.value})
+        this.setState({phone: event.target.value})
     }
     assignTitleHandler = (event) => {
-        this.setState({title : event.target.value})
+        this.setState({title: event.target.value})
     }
 
     // Reset Form Values
@@ -61,10 +73,10 @@ class Address extends React.Component {
         this.setState(() => this.initialState)
     }
 
-    submitAddresss = (e) => {
+    calculateAddress = (e) => {
         e.preventDefault();
 
-        if(this.state.title == null && this.state.addresss == null) {
+        if (this.state.title == null && this.state.addresss == null) {
             alert("Fill All Data!!!");
         } else {
             let formAddress = {
@@ -78,11 +90,68 @@ class Address extends React.Component {
                 phone: this.state.phone
             }
             console.log('Address => ' + JSON.stringify(formAddress));
-            AddressService.postAddress(formAddress)
+            AddressService.postCalculateAddress(formAddress)
                 .catch(function (error) {
                     console.log(error);
                 }).then(res => {
-                this.props.history.push('/delivery');
+                this.addressShowHandler();
+                this.setState({
+                    deliveryCost: res,
+                    totalCost: this.state.orderCost + res
+                });
+            });
+        }
+    }
+
+    addressShowHandler() {
+        this.setState({
+            title2: this.state.title,
+            address2: this.state.addresss,
+            province2: this.state.province,
+            district2: this.state.district,
+            city2: this.state.city,
+            zip2: this.state.zip,
+            phone2: this.state.phone
+        })
+    }
+
+    submitAddress = (event) => {
+        event.preventDefault();
+
+        if (this.state.addresss == null) {
+            alert("Fill All Data!!!");
+        } else {
+            let newAddress = {
+                userid: '1',
+                title: this.state.title,
+                addresss: this.state.addresss,
+                province: this.state.province,
+                district: this.state.district,
+                city: this.state.city,
+                zip: this.state.zip,
+                phone: this.state.phone
+            }
+
+            let totPrice = {
+                price: this.state.totalCost
+            }
+
+            // Send total Price to Payment Gateway
+            AddressService.postAddress(newAddress)
+                .catch(function (error) {
+                    console.log(error);
+                }).then(() => {
+                console.log('NEW ADDRESS ADDED TO DATABASE!');
+                console.log('Address => ' + JSON.stringify(newAddress));
+            });
+
+            // Save address in database
+            AddressService.postTotalPrice(totPrice)
+                .catch(function (error) {
+                    console.log(error);
+                }).then(() => {
+                console.log('TOTAL PRICE SENDS TO PAYMENT GATEWAY! \n' + JSON.stringify(totPrice));
+                this.props.history.push('/payment');
             });
         }
     }
@@ -92,17 +161,21 @@ class Address extends React.Component {
 
     render() {
         return (
-            <div>
+            <div className={'container'}>
                 <Card>
                     <Card.Body>
-                        <h1>Add New Address</h1>
-                        <Form id={'addNewBrandForm'}
-                              onSubmit={this.submitAddresss.bind(this)}
+                        <h1 className={'card-header text-center'}>Delivery Service</h1>
+                        <br/>
+                        <h4>Enter a Address</h4>
+                        <Form id={'addAddressForm'}
+                              onSubmit={this.calculateAddress.bind(this)}
                               onReset={this.resetForm.bind(this)}>
+
                             <Form.Row>
                                 <Form.Group as={Col} controlId="FormAddress">
                                     <Form.Label>Address</Form.Label>
                                     <Form.Control required as="textarea"
+                                                  placeholder={'Address Here...'}
                                                   rows={3}
                                                   name={'addresss'}
                                                   value={this.state.addresss}
@@ -111,13 +184,26 @@ class Address extends React.Component {
                             </Form.Row>
 
                             <Form.Row>
+                                <Form.Group as={Col} controlId="formTitle">
+                                    <Form.Label>Delivery Destination</Form.Label>
+                                    <Form.Control required as="select"
+                                                  name={'title'}
+                                                  value={this.state.title}
+                                                  onChange={this.assignTitleHandler}>
+                                        <option> </option>
+                                        <option>Home</option>
+                                        <option>Office</option>
+                                        <option>Other</option>
+                                    </Form.Control>
+                                </Form.Group>
+
                                 <Form.Group as={Col} controlId="formProvince">
                                     <Form.Label>Province</Form.Label>
                                     <Form.Control required as="select"
                                                   name={'province'}
                                                   value={this.state.province}
                                                   onChange={this.assignProvinceHandler}>
-                                        <option></option>
+                                        <option> </option>
                                         <option>Central</option>
                                         <option>Eastern</option>
                                         <option>North Central</option>
@@ -136,7 +222,7 @@ class Address extends React.Component {
                                                   name={'district'}
                                                   value={this.state.district}
                                                   onChange={this.assignDistrictHandler}>
-                                        <option></option>
+                                        <option> </option>
                                         <option>Ampara</option>
                                         <option>Anuradhapura</option>
                                         <option>Badulla</option>
@@ -174,57 +260,71 @@ class Address extends React.Component {
                                 </Form.Group>
 
                                 <Form.Group as={Col} controlId="formZip">
-                                    <Form.Label>Zip</Form.Label>
+                                    <Form.Label>Postcode</Form.Label>
                                     <Form.Control required name={'zip'}
                                                   value={this.state.zip}
                                                   onChange={this.assignZipHandler}/>
                                 </Form.Group>
-                            </Form.Row>
 
-                            <Form.Row>
                                 <Form.Group as={Col} controlId="formPhone">
                                     <Form.Label>Phone No</Form.Label>
                                     <Form.Control required name={'phone'}
                                                   value={this.state.phone}
                                                   onChange={this.assignPhoneHandler}/>
                                 </Form.Group>
-
-                                <Form.Group as={Col} controlId="formTitle">
-                                    <Form.Label>Delivery Destination</Form.Label>
-                                    <Form.Control required as="select"
-                                                  name={'title'}
-                                                  value={this.state.title}
-                                                  onChange={this.assignTitleHandler}>
-                                        <option></option>
-                                        <option>Home</option>
-                                        <option>Office</option>
-                                        <option>Other</option>
-                                    </Form.Control>
-                                </Form.Group>
                             </Form.Row>
 
                             <div>
-                                <Button type={'submit'} className={'btn btn-primary'}>Save</Button>{'\u00A0'}
+                                <Button type={'submit'} className={'btn btn-primary'}>Add</Button>{'\u00A0'}
                                 <Button type={'reset'} className={'btn btn-warning'}>Reset</Button>{'\u00A0'}
-                                <Link to="/delivery" className="btn btn-primary">Cancel</Link>
                             </div>
-                            {/*<Form.Row>*/}
-                            {/*    <Form.Group as={Col}>*/}
-                            {/*        */}
-                            {/*    </Form.Group>*/}
-                            {/*    <Form.Group as={Col}>*/}
-                            {/*        */}
-                            {/*    </Form.Group>*/}
-                            {/*    <Form.Group as={Col}>*/}
-                            {/*        */}
-                            {/*    </Form.Group>*/}
-                            {/*</Form.Row>*/}
                         </Form>
+
+                        <br/>
+                        <div className={'container'}>
+                            <h4>{this.state.title2}</h4>
+                            <p>{this.state.address2}<br/>
+                                {this.state.province2}<br/>
+                                {this.state.district2}<br/>
+                                {this.state.city2}<br/>
+                                {this.state.zip2}<br/>
+                                {this.state.phone2}</p>
+                        </div>
                     </Card.Body>
+
+                    <Card.Footer>
+                        <Form id={'submitAddress'} onSubmit={this.submitAddress.bind(this)}>
+                            <Form.Control required name={'addresss'} defaultValue={this.state.addresss} hidden={true}/>
+                            <Form.Control required name={'province'} defaultValue={this.state.province} hidden={true}/>
+                            <Form.Control required name={'district'} defaultValue={this.state.district} hidden={true}/>
+                            <Form.Control required name={'city'} defaultValue={this.state.city} hidden={true}/>
+                            <Form.Control required name={'zip'} defaultValue={this.state.zip} hidden={true}/>
+                            <Form.Control required name={'phone'} defaultValue={this.state.phone} hidden={true}/>
+                            <Form.Control required name={'title'} defaultValue={this.state.title} hidden={true}/>
+
+                            <Table striped bordered hover>
+                                <tbody>
+                                <tr>
+                                    <td><Form.Label>Order Price</Form.Label></td>
+                                    <td>{this.state.orderCost}</td>
+                                </tr>
+                                <tr>
+                                    <td><Form.Label>Delivery Price</Form.Label></td>
+                                    <td>{this.state.deliveryCost}</td>
+                                </tr>
+                                <tr>
+                                    <td><Form.Label>Total Price</Form.Label></td>
+                                    <td>{this.state.totalCost}</td>
+                                </tr>
+                                </tbody>
+                            </Table>
+                            <Button type={'submit'} className="btn btn-warning">Pay Here</Button>
+                        </Form>
+                    </Card.Footer>
                 </Card>
             </div>
         );
     }
 }
 
-export default Address;
+export default DeliveryGateway;
